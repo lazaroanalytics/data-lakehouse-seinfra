@@ -1,0 +1,53 @@
+==================================================
+EXECUTION DATE/TIME: 2026-09-03 15:16:18
+DATASET PROCESSED  : SCHEDULE
+CONSOLIDATED ROWS  : 130
+EXPANDED ROWS      : 26,066
+SOURCE FILES MOVED TO BRONZE:
+  - schedule_sgti_2026_01.xlsx (File Created/Modified: 2026-09-03 14:14:08)
+  - schedule_sgti_2026_02.xlsx (File Created/Modified: 2026-09-03 14:14:20)
+==================================================
+
+==================================================
+EXECUTION DATE/TIME: 2026-09-03 15:16:19
+DATASET PROCESSED  : SERVICES
+CONSOLIDATED ROWS  : 38
+SOURCE FILES MOVED TO BRONZE:
+  - services_sgti_2026_01.xlsx (File Created/Modified: 2026-09-03 14:24:15)
+  - services_sgti_2026_02.xlsx (File Created/Modified: 2026-09-03 14:24:19)
+==================================================
+
+==================================================
+EXECUTION DATE/TIME: 2026-09-03 15:16:19
+DATASET PROCESSED  : VEHICLES
+CONSOLIDATED ROWS  : 445
+SOURCE FILES MOVED TO BRONZE:
+  - vehicles_sgti_2026_01.xlsx (File Created/Modified: 2026-09-03 14:23:18)
+  - vehicles_sgti_2026_02.xlsx (File Created/Modified: 2026-09-03 14:23:03)
+==================================================
+
+==================================================
+EXECUTION DATE/TIME: 2026-09-03 15:44:14
+DATASET PROCESSED  : SCHEDULE
+CONSOLIDATED ROWS  : 65
+EXPANDED ROWS      : 13,033
+SOURCE FILES MOVED TO BRONZE:
+  - schedule_sgti_2026_03.xlsx (File Created/Modified: 2026-09-03 14:14:09)
+==================================================
+
+==================================================
+EXECUTION DATE/TIME: 2026-09-03 15:44:14
+DATASET PROCESSED  : SERVICES
+CONSOLIDATED ROWS  : 19
+SOURCE FILES MOVED TO BRONZE:
+  - services_sgti_2026_03.xlsx (File Created/Modified: 2026-09-03 14:23:52)
+==================================================
+
+==================================================
+EXECUTION DATE/TIME: 2026-09-03 15:44:14
+DATASET PROCESSED  : VEHICLES
+CONSOLIDATED ROWS  : 234
+SOURCE FILES MOVED TO BRONZE:
+  - vehicles_sgti_2026_03.xlsx (File Created/Modified: 2026-09-03 14:22:58)
+==================================================
+
