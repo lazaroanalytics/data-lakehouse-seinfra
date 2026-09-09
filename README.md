@@ -39,8 +39,8 @@ flowchart TD
     style F fill:#ffe6e6,stroke:#ff4d4d,stroke-width:1px
     style E fill:#e6f2ff,stroke:#3385ff,stroke-width:1px
     style H fill:#e6ffe6,stroke:#33cc33,stroke-width:1px
-    style I fill:#e6ffe6,stroke:#33cc33,stroke-width:1px
-
+    style I fill:#e6ffe6,stroke:#33cc33,stroke-width:1px```
+    
 ## 📂 Project Structure
 
 ```text
@@ -51,10 +51,11 @@ data-lakehouse-seinfra/
 │   ├── sgti_silver_layer.py          # Consolidation & schedule expansion
 │   └── op_audit_reincorporation.py   # Re-ingestion workflow for resolved DLQ items
 ├── requirements.txt
-└── README.md
+└── README.md```
 
 ## 🚀 Execution Workflow
 
+```text
 * **1. Operational Ingestion & Bronze (`op_bronze_layer.py`)**: Validates raw operational spreadsheets, routes malformed rows to DLQ (`audit_discarded_data.xlsx`), and saves clean data as Bronze Parquet.
 * **2. SGTI Consolidation & Silver (`sgti_silver_layer.py`)**: Consolidates registry metadata using MD5 hashing and expands schedule matrices into projected daily trip instances.
-* **3. Audit Reincorporation (`op_audit_reincorporation.py`)**: Re-ingests manually resolved records (`CORRIGIDO_POR_HUMANO = "SIM"`) back into Bronze storage.
+* **3. Audit Reincorporation (`op_audit_reincorporation.py`)**: Re-ingests manually resolved records (`CORRIGIDO_POR_HUMANO = "SIM"`) back into Bronze storage.```
