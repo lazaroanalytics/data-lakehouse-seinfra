@@ -78,7 +78,7 @@ data-lakehouse-seinfra/
 
 ## 📌 Roadmap
 
-- [ ] **Silver Operational Processing (`op_silver_layer.py`):** Deduplication and timestamp normalization across operators.
+- [ ] **Silver Operational Processing (`op_silver_layer.py`):** Data standardization, enrichment, and regulatory business validation.
 - [ ] **BMI Report Pipeline:** Ingestion and metrics tracking for Monthly Informative Bulletins.
 - [ ] **Gold Layer Modeling:** Star Schema design for Power BI reporting assets.
 - [ ] **Automated Non-Compliance Loop:** Automated notifications for rejected operational submissions.
