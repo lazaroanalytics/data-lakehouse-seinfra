@@ -10,34 +10,44 @@ An end-to-end Data Lakehouse solution designed for public transport regulation, 
 
 ```mermaid
 flowchart TD
-    subgraph Landing[" Landing & Ingestion "]
-        A[SEI Operational Spreadsheets] -->|Raw Files| B[op_bronze_layer.py]
-        C[SGTI System Metadata] -->|Registry Data| D[sgti_silver_layer.py]
+    subgraph Landing[" 1. Entrada de Dados (Landing Zone) "]
+        A[Planilhas Operacionais SEI]
+        B[Bases Cadastrais SGTI]
     end
 
-    subgraph Bronze[" Bronze Layer "]
-        B -->|Validation Pass| E[(Bronze Parquet Storage)]
-        B -->|Validation Fail| F[DLQ: audit_discarded_data.xlsx]
-        F -->|Human Correction| G[op_audit_reincorporation.py]
-        G -->|Re-ingestion| E
+    subgraph Bronze[" 2. Camada Bronze (Dados Brutos & Auditoria) "]
+        A -->|op_bronze_layer.py| C[(Operational Bronze Parquet)]
+        A -.->|Dados Rejeitados| D[DLQ: audit_discarded_data.xlsx]
+        D -->|Correção Manual / reincorporation.py| C
     end
 
-    subgraph Silver[" Silver Layer "]
-        D -->|Consolidation & MD5 Cache| H[(SGTI Parquet Datasets)]
-        D -->|Matrix Expansion Engine| I[(Expanded Schedule Trips 2026)]
+    subgraph Silver[" 3. Camada Silver (Limpeza & Normalização) "]
+        C -->|op_silver_layer.py| E[(Operational Silver Parquet)]
+        
+        B -->|sgti_silver_layer.py| F[(SGTI Silver: Veículos & Serviços)]
+        B -->|Expansão de Horários| G[(SGTI Silver: Programação 2026)]
     end
 
-    subgraph Gold[" Future Gold Layer "]
-        E -.- K[(Dimensional Models / Star Schema)]
-        H -.- K
-        I -.- K
-        K -.- L[Power BI Dashboards]
+    subgraph Gold[" 4. Camada Gold (Consistência Mensal & BI) "]
+        E --> H[op_sgti_gold_layer.py]
+        F --> H
+        G --> H
+        
+        H --> I[(Gold Parquet: OP x SGTI)]
+        I --> J[Dashboards Power BI]
     end
 
-    style F fill:#ffe6e6,stroke:#ff4d4d,stroke-width:1px
-    style E fill:#e6f2ff,stroke:#3385ff,stroke-width:1px
-    style H fill:#e6ffe6,stroke:#33cc33,stroke-width:1px
-    style I fill:#e6ffe6,stroke:#33cc33,stroke-width:1px
+    subgraph Reporting[" 5. Orquestração & Relatório Final (main.py) "]
+        K[Execução da Pipeline] --> L[/Relatório Tabular de Erros no Console\]
+    end
+
+    style D fill:#ffe6e6,stroke:#ff4d4d,stroke-width:1px
+    style C fill:#e6f2ff,stroke:#3385ff,stroke-width:1px
+    style E fill:#e6ffe6,stroke:#33cc33,stroke-width:1px
+    style F fill:#e6ffe6,stroke:#33cc33,stroke-width:1px
+    style G fill:#e6ffe6,stroke:#33cc33,stroke-width:1px
+    style I fill:#fff2cc,stroke:#d6b656,stroke-width:2px
+    style L fill:#f8cecc,stroke:#b85450,stroke-width:1.5px
 ```
 
 ---
