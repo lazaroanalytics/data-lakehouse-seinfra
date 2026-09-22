@@ -6,10 +6,21 @@ import json
 from pathlib import Path
 import shutil
 import time
+from typing import Dict, Any
 import pandas as pd
+import re
+
+DATASET_TYPE_ALIAS = {
+    "horarios": "schedule",
+    "schedule": "schedule",
+    "linhascomdatacontrato": "services",
+    "service": "service",
+    "consultaveiculos": "vehicles",
+    "vehicles": "vehicles",
+}
 
 # ==============================================
-# DIRECTORY CONFIGURATION (PROJECT_ROOT BASED)
+# 1. DIRECTORY CONFIGURATION
 # ==============================================
 SCRIPT_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = SCRIPT_DIR.parent.parent
@@ -24,8 +35,70 @@ CACHE_METADATA_FILE = SILVER_DIR / ".consolidation_cache.json"
 LOG_TXT_FILE = SILVER_DIR / "consolidation_log.txt"
 
 # ==============================================
-# SCHEMA & MAPPING CONFIGURATION
+# 2. COLUMN MAPPING CONFIGURATION (PT ➔ EN)
 # ==============================================
+COLUMN_MAPPING_CONFIG = {
+    "schedule": {
+        "Número Linha": "service_id",
+        "Trajeto": "path",
+        "Horário": "schedule_time",
+        "Número Veículos": "number_of_vehicles",
+        "Feriado": "holiday",
+        "Segunda": "monday",
+        "Terça": "tuesday",
+        "Quarta": "wednesday",
+        "Quinta": "thursday",
+        "Sexta": "friday",
+        "Sábado": "saturday",
+        "Domingo": "sunday",
+        "Janeiro": "january",
+        "Fevereiro": "february",
+        "Março": "march",
+        "Abril": "april",
+        "Maio": "may",
+        "Junho": "june",
+        "Julho": "july",
+        "Agosto": "august",
+        "Setembro": "september",
+        "Outubro": "october",
+        "Novembro": "november",
+        "Dezembro": "december",
+    },
+    "service": {
+        "Linha": "service_id",
+        "Nome": "service_name",
+        "Código delegatária": "delegated_company_cod",
+        "Delegatária": "delegated_company_name",
+        "Situação delegatária": "delegated_company_status",
+        "Situação da linha": "service_status",
+        "Data de vencimento": "contract_expiration",
+        "Número do contrato": "contract_number",
+        "Tipo utilização": "utilization",
+        "Veículos necessários": "necessary_vehicles",
+        "Custo da passagem": "ticket_cost",
+        "Viag. programadas": "trips_per_week",
+        "Núm. meses de operação": "months_of_operation",
+    },
+    "vehicles": {
+        "Número": "vehicle_number",
+        "Placa": "plate",
+        "Data de Registro": "registration_date",
+        "Utilização": "utilization",
+        "Código": "delegated_company_code",
+        "Delegatária": "delegated_company_name",
+        "Marca chassi": "chassis_manufacturer",
+        "Modelo chassi": "chassis_model",
+        "Ano chassi": "chassis_year",
+        "Situação": "situation",
+        "Data baixa": "deactivation_date",
+        "Marca carroçaria": "bodywork_manufacturer",
+        "Modelo carroçaria": "bodywork_model",
+        "Cores": "colors",
+        "Equipamentos": "equipment",
+        "Combustível": "fuel",
+    },
+}
+
 DATASET_SCHEMA_CONFIG = {
     "schedule": {
         "service_id": "service_id",
@@ -39,59 +112,28 @@ DATASET_SCHEMA_CONFIG = {
             "january", "february", "march", "april", "may", "june",
             "july", "august", "september", "october", "november", "december"
         ]
-    },
-    "service": {
-        "service_id": "service_id",
-        "service_name": "service_name",
-        "delegated_company_cod": "delegated_company_cod",
-        "delegated_company_name": "delegated_company_name",
-        "delegated_company_status": "delegated_company_status",
-        "service_status": "servie_status",
-        "contract_expiration": "contract_expiration",
-        "contract_number": "contract_number",
-        "utilization": "utilization",
-        "necessary_vehicles": "necessary_vehicles",
-        "ticket_cost": "ticket_cost",
-        "trips_per_week": "trips_per_week",
-        "months_of_operation": "months_of_operation"
-    },
-    "vehicles": {
-        "registration_date": "registration_date",
-        "utilization": "utilization",
-        "delegated_company_code": "delegated_company_code",
-        "delegated_company_name": "delegated_company_name",
-        "chassis_manufacturer": "chassis_manufacturer",
-        "chassis_model": "chassis_model",
-        "chassis_year": "chassis_year",
-        "situation": "situation",
-        "deactivation_date": "deactivation_date",
-        "bodywork_manufacturer": "bodywork_manufacturer",
-        "bodywork_model": "bodywork_model",
-        "colors": "colors",
-        "equipment": "equipment",
-        "fuel": "fuel"
     }
 }
 
 # ==============================================
-# CONSTANTS & MAPS FOR SCHEDULE EXPANSION
+# 3. CONSTANTS & MAPS FOR SCHEDULE EXPANSION
 # ==============================================
 EXPANSION_YEAR = 2026
 
 HOLIDAYS = {
-    f"{EXPANSION_YEAR}-01-01",  # New Year's Day
-    f"{EXPANSION_YEAR}-02-16",  # Carnival
-    f"{EXPANSION_YEAR}-02-17",  # Carnival
-    f"{EXPANSION_YEAR}-04-03",  # Good Friday
-    f"{EXPANSION_YEAR}-04-21",  # Tiradentes Day
-    f"{EXPANSION_YEAR}-05-01",  # Labor Day
-    f"{EXPANSION_YEAR}-06-04",  # Corpus Christi
-    f"{EXPANSION_YEAR}-09-07",  # Independence Day
-    f"{EXPANSION_YEAR}-10-12",  # Our Lady of Aparecida
-    f"{EXPANSION_YEAR}-11-02",  # All Souls' Day
-    f"{EXPANSION_YEAR}-11-15",  # Republic Proclamation Day
-    f"{EXPANSION_YEAR}-11-20",  # Black Awareness Day
-    f"{EXPANSION_YEAR}-12-25",  # Christmas
+    f"{EXPANSION_YEAR}-01-01",
+    f"{EXPANSION_YEAR}-02-16",
+    f"{EXPANSION_YEAR}-02-17",
+    f"{EXPANSION_YEAR}-04-03",
+    f"{EXPANSION_YEAR}-04-21",
+    f"{EXPANSION_YEAR}-05-01",
+    f"{EXPANSION_YEAR}-06-04",
+    f"{EXPANSION_YEAR}-09-07",
+    f"{EXPANSION_YEAR}-10-12",
+    f"{EXPANSION_YEAR}-11-02",
+    f"{EXPANSION_YEAR}-11-15",
+    f"{EXPANSION_YEAR}-11-20",
+    f"{EXPANSION_YEAR}-12-25",
 }
 
 WEEKDAYS_MAP = {
@@ -120,10 +162,59 @@ MONTHS_MAP = {
 }
 
 
+def is_truthy(val) -> bool:
+    if pd.isna(val):
+        return False
+    s = str(val).strip().upper()
+    return s in {"S", "SIM", "Y", "YES", "1", "TRUE"}
+
+
+def safe_read_sgti_file(file_path: Path) -> pd.DataFrame:
+    """Lê arquivos SGTI tratando diversos formatos e relatórios HTML/XML mascarados como XLS."""
+    ext = file_path.suffix.lower()
+    
+    if ext == ".parquet":
+        return pd.read_parquet(file_path)
+
+    if ext == ".csv":
+        try:
+            return pd.read_csv(file_path, dtype=str, encoding="utf-8")
+        except UnicodeDecodeError:
+            return pd.read_csv(file_path, dtype=str, encoding="latin1", sep=";")
+
+    try:
+        return pd.read_excel(file_path, dtype=str)
+    except Exception:
+        pass
+
+    try:
+        return pd.read_excel(file_path, dtype=str, engine="xlrd")
+    except Exception:
+        pass
+
+    try:
+        dfs = pd.read_html(str(file_path))
+        if dfs:
+            df = dfs[0]
+            df.columns = [str(col).strip() for col in df.columns]
+            return df.astype(str)
+    except Exception:
+        pass
+
+    raise ValueError(f"Não foi possível determinar a engine de leitura adequada para: {file_path.name}")
+
+
 def parse_file_metadata(file_path: Path):
-    parts = file_path.stem.split("_")
+    stem = file_path.stem
+    match = re.search(r"^([A-Za-z]+)[\s_]+(\d{4})\.(\d{2})\.(\d{2})", stem)
+    if match:
+        dataset_type = match.group(1)
+        month = match.group(3)
+        return dataset_type, month
+
+    parts = stem.split()
     dataset_type = parts[0]
-    month = parts[-1]
+    month = parts[1].split(".")[1] if len(parts) > 1 and "." in parts[1] else "01"
     return dataset_type, month
 
 
@@ -187,7 +278,6 @@ def append_update_log(dataset_type: str, file_list: list, total_rows_raw: int, t
 def expand_schedule_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     print("   ⚡ Initiating Schedule expansion pipeline...")
     df = df.copy()
-    df.columns = df.columns.str.strip().str.lower()
 
     cfg = DATASET_SCHEMA_CONFIG["schedule"]
 
@@ -236,8 +326,7 @@ def expand_schedule_dataframe(df: pd.DataFrame) -> pd.DataFrame:
             if month_key not in df.columns:
                 continue
 
-            month_active = str(row.get(month_key, "")).strip().upper()
-            if month_active != "Y":
+            if not is_truthy(row.get(month_key)):
                 continue
 
             month_name, month_num = MONTHS_MAP[month_key]
@@ -250,8 +339,8 @@ def expand_schedule_dataframe(df: pd.DataFrame) -> pd.DataFrame:
 
                 is_holiday = date_str in HOLIDAYS
 
-                runs_on_day = str(row.get(weekday_key, "")).strip().upper() == "Y"
-                runs_on_holiday = str(row.get(holiday_col, "")).strip().upper() == "Y"
+                runs_on_day = is_truthy(row.get(weekday_key))
+                runs_on_holiday = is_truthy(row.get(holiday_col))
 
                 if is_holiday:
                     if not (runs_on_day or runs_on_holiday):
@@ -280,10 +369,18 @@ def expand_schedule_dataframe(df: pd.DataFrame) -> pd.DataFrame:
     return expanded_df
 
 
-def consolidate_sgti_datasets(force_rebuild: bool = False):
+def consolidate_sgti_datasets(force_rebuild: bool = False) -> Dict[str, str]:
+    """
+    Processa e consolida os arquivos do SGTI.
+    Retorna um dicionário {nome_arquivo: motivo_erro} com todos os problemas encontrados.
+    """
+    erros_sgti: Dict[str, str] = {}
+
     if not INPUT_DIR.exists():
-        print(f"❌ Input directory not found: {INPUT_DIR}")
-        return
+        msg = f"Diretório de entrada não encontrado: {INPUT_DIR}"
+        print(f"❌ {msg}")
+        erros_sgti["diretorio_sgti"] = msg
+        return erros_sgti
 
     SILVER_DIR.mkdir(parents=True, exist_ok=True)
     BRONZE_DIR.mkdir(parents=True, exist_ok=True)
@@ -297,7 +394,7 @@ def consolidate_sgti_datasets(force_rebuild: bool = False):
 
     if not files:
         print(f"ℹ️ No new SGTI files found for ingestion in: {INPUT_DIR}")
-        return
+        return erros_sgti
 
     dataset_groups = defaultdict(list)
     for file in files:
@@ -311,16 +408,18 @@ def consolidate_sgti_datasets(force_rebuild: bool = False):
     cache_metadata = load_cache_metadata()
 
     for dataset_type, file_list in dataset_groups.items():
-        consolidated_filename = f"consolidated_{dataset_type}.parquet"
+        target_dataset_type = DATASET_TYPE_ALIAS.get(dataset_type.lower(), dataset_type.lower())
+        is_schedule = target_dataset_type == "schedule"
+
+        consolidated_filename = f"consolidated_{target_dataset_type}.parquet"
         consolidated_path = SILVER_DIR / consolidated_filename
 
-        expanded_filename = f"expanded_{dataset_type}.parquet"
+        expanded_filename = f"expanded_{target_dataset_type}.parquet"
         expanded_path = SILVER_DIR / expanded_filename
 
         current_group_hash = calculate_group_hash(file_list)
         cached_group_hash = cache_metadata.get(dataset_type)
 
-        is_schedule = dataset_type.lower() == "schedule"
         files_exist = (
             consolidated_path.exists() and expanded_path.exists()
             if is_schedule
@@ -333,99 +432,139 @@ def consolidate_sgti_datasets(force_rebuild: bool = False):
             )
             continue
 
-        months = [item["month"] for item in file_list]
+        # Agrupa arquivos do mesmo dataset por mês e escolhe a versão mais recente/retificada
+        files_by_month = defaultdict(list)
+        for item in file_list:
+            files_by_month[item["month"]].append(item)
 
-        seen_months = set()
-        duplicate_months = set()
-        for m in months:
-            if m in seen_months:
-                duplicate_months.add(m)
+        selected_file_list = []
+        for m, items in files_by_month.items():
+            if len(items) > 1:
+                # Extrai número da retificação (RET1 -> 1, RET2 -> 2, sem RET -> 0)
+                def get_ret_num(item_obj):
+                    name = item_obj["path"].stem.upper()
+                    match = re.search(r"_RET(\d+)", name)
+                    return int(match.group(1)) if match else 0
+
+                # Ordena por número de RET e depois por data de modificação
+                items_sorted = sorted(
+                    items, 
+                    key=lambda x: (get_ret_num(x), x["path"].stat().st_mtime), 
+                    reverse=True
+                )
+                escolhido = items_sorted[0]
+                print(f"   ℹ️ Retificação detectada no SGTI mês {m}: usando '{escolhido['path'].name}' e ignorando versão(ões) anterior(es).")
+                selected_file_list.append(escolhido)
             else:
-                seen_months.add(m)
+                selected_file_list.append(items[0])
 
-        if duplicate_months:
-            print(
-                f"🚨 [ABORTED] Duplicate reference month(s) {sorted(list(duplicate_months))} found for '{dataset_type}'."
-            )
-            print(
-                f"   └─ Skipping consolidation for '{dataset_type}' due to month collision.\n"
-            )
-            continue
-
-        for target_path in [consolidated_path, expanded_path if is_schedule else None]:
-            if target_path and target_path.exists():
-                try:
-                    target_path.unlink()
-                    print(f"🧹 Stale output file purged: {target_path.name}")
-                except Exception as e:
-                    print(f"   ├─ ❌ Failed to purge target file {target_path.name}: {e}")
-
+        file_list = selected_file_list
+        
         df_list = []
+        files_failed_in_group = []
         print(f"📦 Stacking dataset category '{dataset_type}':")
+
         for item in file_list:
             file_path = item["path"]
             try:
-                if file_path.suffix.lower() in [".xlsx", ".xls"]:
-                    df = pd.read_excel(file_path)
-                elif file_path.suffix.lower() == ".csv":
-                    df = pd.read_csv(file_path)
-                elif file_path.suffix.lower() == ".parquet":
-                    df = pd.read_parquet(file_path)
+                df = safe_read_sgti_file(file_path)
+                df.columns = df.columns.str.strip()
 
+                mapping = COLUMN_MAPPING_CONFIG.get(target_dataset_type, {})
+                df = df.rename(columns=mapping)
+
+                df["file_month"] = item["month"]
                 df_list.append(df)
                 print(
                     f"   ├─ Loaded: {file_path.name} ({len(df)} rows | Month: {item['month']})"
                 )
             except Exception as e:
-                print(f"   ├─ ❌ Failed to read {file_path.name}: {e}")
+                msg_erro = f"Falha ao ler/converter arquivo SGTI: {e}"
+                print(f"   ├─ ❌ {file_path.name}: {msg_erro}")
+                erros_sgti[file_path.name] = msg_erro
+                files_failed_in_group.append(file_path)
 
         if df_list:
-            consolidated_df = pd.concat(df_list, ignore_index=True)
+            try:
+                consolidated_df = pd.concat(df_list, ignore_index=True)
 
-            if "service_id" in consolidated_df.columns:
-                consolidated_df["service_id"] = consolidated_df["service_id"].astype(str)
+                if "service_id" in consolidated_df.columns:
+                    consolidated_df["service_id"] = consolidated_df["service_id"].astype(str)
 
-            consolidated_df.to_parquet(consolidated_path, index=False)
-            print(
-                f"   ├─ 🟢 [SILVER] Consolidated output saved ({len(consolidated_df):,} rows): {consolidated_path.name}"
-            )
+                # Tratamento de Frota Histórica (Veículos SGTI)
+                if target_dataset_type == "vehicles":
+                    print("   ⚡ Processando histórico de frota e sinalizando registros mais recentes...")
+                    consolidated_df["file_month"] = pd.to_numeric(consolidated_df["file_month"], errors="coerce")
+                    col_placa = "plate" if "plate" in consolidated_df.columns else "license_plate"
 
-            total_expanded_rows = None
+                    if col_placa in consolidated_df.columns:
+                        max_month_per_plate = consolidated_df.groupby(col_placa)["file_month"].transform("max")
+                        consolidated_df["is_latest_record"] = consolidated_df["file_month"] == max_month_per_plate
+                    else:
+                        consolidated_df["is_latest_record"] = True
 
-            if is_schedule:
-                expanded_df = expand_schedule_dataframe(consolidated_df)
-                expanded_df.to_parquet(expanded_path, index=False)
-                total_expanded_rows = len(expanded_df)
+                # Exportação para Parquet Silver
+                temp_consolidated_path = consolidated_path.with_suffix(".parquet.tmp")
+                consolidated_df.to_parquet(temp_consolidated_path, index=False)
+                temp_consolidated_path.replace(consolidated_path)
+        
                 print(
-                    f"   ├─ 🟢 [SILVER] Expanded output saved ({total_expanded_rows:,} rows): {expanded_path.name}"
+                    f"   ├─ 🟢 [SILVER] Consolidated output saved ({len(consolidated_df):,} rows): {consolidated_path.name}"
                 )
 
-            append_update_log(
-                dataset_type=dataset_type,
-                file_list=file_list,
-                total_rows_raw=len(consolidated_df),
-                total_rows_expanded=total_expanded_rows,
-            )
+                total_expanded_rows = None
 
-            cache_metadata[dataset_type] = current_group_hash
-            save_cache_metadata(cache_metadata)
+                if is_schedule:
+                    expanded_df = expand_schedule_dataframe(consolidated_df)
+                    temp_expanded_path = expanded_path.with_suffix(".parquet.tmp")
+                    expanded_df.to_parquet(temp_expanded_path, index=False)
+                    temp_expanded_path.replace(expanded_path)
+            
+                    total_expanded_rows = len(expanded_df)
+                    print(
+                        f"   ├─ 🟢 [SILVER] Expanded output saved ({total_expanded_rows:,} rows): {expanded_path.name}"
+                    )
 
-            for item in file_list:
-                src_path = item["path"]
-                dst_path = BRONZE_DIR / src_path.name
-                
-                for attempt in range(3):
-                    try:
-                        shutil.move(src_path, dst_path)
-                        print(f"   ├─ 🚚 [BRONZE] Moved: {src_path.name} ➔ bronze/sgti/2026/")
-                        break
-                    except PermissionError:
-                        if attempt < 2:
-                            time.sleep(0.5)
-                        else:
-                            raise
+                append_update_log(
+                    dataset_type=dataset_type,
+                    file_list=file_list,
+                    total_rows_raw=len(consolidated_df),
+                    total_rows_expanded=total_expanded_rows,
+                )
+
+                cache_metadata[dataset_type] = current_group_hash
+                save_cache_metadata(cache_metadata)
+
+                # Mover arquivos processados para a pasta Bronze
+                for item in file_list:
+                    src_path = item["path"]
+                    # Pula arquivos que deram erro na leitura individual
+                    if src_path in files_failed_in_group:
+                        continue
+
+                    dst_path = BRONZE_DIR / src_path.name
+                    for attempt in range(3):
+                        try:
+                            shutil.move(src_path, dst_path)
+                            print(f"   ├─ 🚚 [BRONZE] Moved: {src_path.name} ➔ bronze/sgti/2026/")
+                            break
+                        except PermissionError:
+                            if attempt < 2:
+                                time.sleep(0.5)
+                            else:
+                                msg_mva = f"Arquivo processado, mas não pôde ser movido para Bronze (Permissão negada)"
+                                erros_sgti[src_path.name] = msg_mva
+
+            except Exception as e:
+                msg_cons = f"Erro no agrupamento/salvamento do dataset '{dataset_type}': {e}"
+                print(f"   └─ ❌ {msg_cons}")
+                for item in file_list:
+                    erros_sgti[item["path"].name] = msg_cons
 
             print()
+
+    return erros_sgti
+
 
 if __name__ == "__main__":
     consolidate_sgti_datasets()
