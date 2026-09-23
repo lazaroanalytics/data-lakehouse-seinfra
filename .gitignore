@@ -1,8 +1,20 @@
-# Ignora toda a pasta data (dados operacionais, SGTI, BMI, etc.)
-data/*
-!data/.gitkeep
+# ==============================================
+# DATA LAKEHOUSE
+# ==============================================
 
-# Permite subir APENAS o template e a documentação na pasta metadata
+# Ignora todos os arquivos dentro de data
+data/**
+
+# Permite que o Git percorra todos os diretórios
+!data/**/
+
+# Permite .gitkeep em qualquer nível
+!data/**/.gitkeep
+
+# ==============================================
+# METADATA - arquivos permitidos no repositorio
+# ==============================================
+
 !data/metadata/
 !data/metadata/dim_delegatarias_template.xlsx
 !data/metadata/README.md
