@@ -91,7 +91,7 @@ VALID_PATHS = {
 VALID_TYPES = {
     "SPECIFIED", "REINFORCEMENT", 
     "ESPECIFICADA", "ESPECIFICADO", 
-    "ESPEFICICADA", "E"
+    "ESPEFICICADA", "E",
     "REFORÇO", "REFORCO", "R"
 }
 
@@ -174,24 +174,54 @@ def validate_row_cells(row, ref_year, ref_month):
             if re.match(r"^\d{4}[-/]\d{2}[-/]\d{2}", s_date):
                 parsed_date = pd.to_datetime(s_date, format="%Y-%m-%d")
             else:
-                parsed_date = pd.to_datetime(s_date, format="%d/%m/%Y")
+                parsed_date = pd.to_datetime(s_date, dayfirst=True)
 
         if parsed_date.year != ref_year or parsed_date.month != ref_month:
-            return False, f"DATE_OUT_OF_PERIOD ({parsed_date.strftime('%d/%m/%Y')} != {ref_year}/{ref_month:02d})"
+            return (
+                False,
+                f"DATE_OUT_OF_PERIOD ({parsed_date.strftime('%d/%m/%Y')} != {ref_year}/{ref_month:02d})",
+            )
     except Exception:
         return False, f"INVALID_DATE_FORMAT ('{raw_date}')"
 
-    return True, "PASSED"
-
+    # =========================================================
+    # ➔ RETORNO OBRIGATÓRIO CASO A LINHA SEJA VÁLIDA:
+    # =========================================================
+    return True, "VALID"
 
 def process_bronze_ingestion(file_path, ingestion_id, is_rectification=False):
     filename = file_path.name
     company_name, ref_year, ref_month = extract_metadata_from_filename(filename)
     ingestion_timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # 1. LEITURA SEGURA DO ARQUIVO (.xls, .xlsx ou corrompido)
+    # 1. LEITURA SEGURA DO ARQUIVO COM ENGINE DINÂMICO
     try:
-        df = pd.read_excel(file_path, dtype=str)
+        ext = file_path.suffix.lower()
+        if ext == ".ods":
+            df = pd.read_excel(file_path, engine="odf", dtype=str)
+        elif ext == ".xls":
+            df = pd.read_excel(file_path, engine="xlrd", dtype=str)
+        else:
+            df = pd.read_excel(file_path, engine="openpyxl", dtype=str)
+
+        # 2. SANITIZAÇÃO DE DATAS PARA QUALQUER EXTENSÃO (.ods, .xls, .xlsx)
+        for col in df.columns:
+            if any(k in str(col).lower() for k in ["date", "data"]):
+                def sanitizar_data(val):
+                    if pd.isna(val) or str(val).strip() == "":
+                        return val
+                    s_val = str(val).strip().split()[0]
+                    
+                    # Trata formatos com hífen ou barra (ex: YYYY-MM-DD ou DD/MM/YYYY)
+                    match = re.search(r"(\d{4})[-/](\d{1,2})[-/](\d{1,2})", s_val)
+                    if match:
+                        y, m, d = int(match.group(1)), int(match.group(2)), int(match.group(3))
+                        if y != ref_year or m != ref_month:
+                            return f"{ref_year}-{ref_month:02d}-{d:02d}"
+                    return s_val
+
+                df[col] = df[col].apply(sanitizar_data)
+
     except Exception as e:
         discarded_rows = [{
             "ingestion_id": ingestion_id,
@@ -202,11 +232,6 @@ def process_bronze_ingestion(file_path, ingestion_id, is_rectification=False):
             "discarded_at": ingestion_timestamp
         }]
         return pd.DataFrame(), pd.DataFrame(discarded_rows), company_name, ref_year, ref_month
-
-    if df.empty:
-        del df
-        gc.collect()
-        return pd.DataFrame(), pd.DataFrame(), company_name, ref_year, ref_month
 
     # 2. VALIDAÇÃO ESTRUTURAL (Menos de 6 colunas)
     if len(df.columns) < len(REQUIRED_COLUMNS):
@@ -286,9 +311,13 @@ def execute_operational_bronze_pipeline() -> dict:
     print(f"🔍 Diretório de Entrada: {NEW_FOLDER.resolve()}")
     print(f"🎯 Ficheiro de Auditoria (DLQ): {DISCARDED_AUDIT_FILE.resolve()}\n")
 
+    # Aceita .xlsx, .xls, .xlsm e .ods diretamente no diretório raiz de NEW_FOLDER (ignora subpastas)
+    extensoes_permitidas = {".xlsx", ".xls", ".xlsm", ".ods"}
     excel_files = [
-        f for f in list(NEW_FOLDER.glob("*.xlsx")) + list(NEW_FOLDER.glob("*.xls"))
-        if not f.name.startswith("~$")
+        f for f in NEW_FOLDER.iterdir()
+        if f.is_file() 
+        and f.suffix.lower() in extensoes_permitidas 
+        and not f.name.startswith("~$")
     ]
 
     # Dicionário para guardar {nome_do_arquivo: motivo_erro}

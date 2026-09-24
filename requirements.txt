@@ -1,7 +1,9 @@
 numpy
+odfpy
 openpyxl
 pandas
 pyarrow
 python-dateutil
 pyyaml
+xlrd
 xlsxwriter
